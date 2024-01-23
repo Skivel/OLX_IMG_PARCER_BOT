@@ -1,13 +1,13 @@
 import os
 from dotenv import load_dotenv, find_dotenv
 
-import telegram
+from telegram import InputMediaPhoto
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-
 
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
 
 load_dotenv(find_dotenv('.env'))
 
@@ -26,6 +26,7 @@ def handle_image_url(update, context, output_folder='downloaded_images'):
 
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
+        update.message.reply_text("Progres: 1/4")
         # Parse the HTML content of the webpage
         soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -34,7 +35,7 @@ def handle_image_url(update, context, output_folder='downloaded_images'):
 
         # Create the output folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
-
+        update.message.reply_text("Progres: 2/4")
         # Download each image with the 'sizes' attribute
         for i, img_tag in enumerate(img_tags):
             img_url = img_tag['src']
@@ -48,12 +49,20 @@ def handle_image_url(update, context, output_folder='downloaded_images'):
                 img_path = os.path.join(output_folder, img_filename)
                 with open(img_path, 'wb') as img_file:
                     img_file.write(img_response.content)
-                update.message.reply_text(f'Image {i + 1} downloaded successfully.')
+                print(f'Image {i + 1} downloaded successfully.')
             else:
                 update.message.reply_text(f'Failed to download image {i + 1}. Status code: {img_response.status_code}')
+        update.message.reply_text("Progres: 3/4")
+        media_group = []
 
         for i, img_tag in enumerate(img_tags):
-            update.message.reply_photo(photo=open(f'downloaded_images/image_{i + 1}.jpg', 'rb'))
+            photo_path = f'downloaded_images/image_{i + 1}.jpg'
+            media_group.append(InputMediaPhoto(media=open(photo_path, 'rb')))
+        update.message.reply_text("Progres: 4/4")
+        if media_group:
+            update.message.reply_media_group(media=media_group, timeout=60)
+        else:
+            update.message.reply_text("No images to send.")
     else:
         update.message.reply_text(f'Failed to retrieve webpage. Status code: {response.status_code}')
 
