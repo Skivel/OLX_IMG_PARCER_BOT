@@ -1,4 +1,5 @@
 import os
+import shutil
 import requests
 import telebot
 
@@ -19,16 +20,20 @@ def hello(message):
 
 
 @bot.message_handler()
-def handle_image_url(message, output_folder='downloaded_images'):
+def handle_image_url(message):
 
-    url = False
+    output_folder = f'downloaded_images/{message.chat.id}'
+
+    users_urls = {}
 
     if message.link_preview_options.url.startswith('https://www.olx'):
         url = message.link_preview_options.url
+        users_urls[f"{message.chat.id}"] = f'{url}'
+        print(users_urls[f'{message.chat.id}'])
 
-    if url:
+    if users_urls[f'{message.chat.id}']:
         # Send an HTTP request to the provided link
-        response = requests.get(url)
+        response = requests.get(users_urls[f'{message.chat.id}'])
 
         # Check if the request was successful (status code 200)
         if response.status_code == 200:
@@ -45,7 +50,7 @@ def handle_image_url(message, output_folder='downloaded_images'):
             # Download each image with the 'sizes' attribute
             for i, img_tag in enumerate(img_tags):
                 img_url = img_tag['src']
-                img_url = urljoin(url, img_url)  # Make sure the URL is absolute
+                img_url = urljoin(users_urls[f'{message.chat.id}'], img_url)  # Make sure the URL is absolute
 
                 # Download the image
                 img_response = requests.get(img_url)
@@ -56,6 +61,7 @@ def handle_image_url(message, output_folder='downloaded_images'):
                     with open(img_path, 'wb') as img_file:
                         img_file.write(img_response.content)
                     print(f'Image {i + 1} downloaded successfully.')
+                    img_file.close()
                 else:
                     bot.send_message(message.chat.id,
                                      f'Failed to download image {i + 1}. Status code: {img_response.status_code}')
@@ -64,13 +70,17 @@ def handle_image_url(message, output_folder='downloaded_images'):
             media_group = []
 
             for i, img_tag in enumerate(img_tags):
-                photo_path = f'downloaded_images/image_{i + 1}.jpg'
-                media_group.append(telebot.types.InputMediaPhoto(media=open(photo_path, 'rb')))
+                photo_path = f'downloaded_images/{message.chat.id}/image_{i + 1}.jpg'
+                with open(photo_path, 'rb') as photo_file:
+                    media_group.append(telebot.types.InputMediaPhoto(media=photo_file.read()))
             bot.send_message(message.chat.id, "Progres: 4/4")
             if media_group:
                 bot.send_media_group(message.chat.id, media_group)
             else:
                 bot.send_message(message.chat.id, "No images to send.")
+
+            shutil.rmtree(f'downloaded_images/{message.chat.id}')
+
         else:
             bot.send_message(message.chat.id, f'Failed to retrieve webpage. Status code: {response.status_code}')
     else:
